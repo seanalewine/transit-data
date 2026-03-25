@@ -233,7 +233,7 @@ def process_route(api_key, route, state):
         for train in trains:
             rn = train.get("rn")
             tr_dr = train.get("trDr")
-            next_stop_id = train.get("nextStapId")
+            next_stop_id = train.get("nextStaId")
             dest_nm = train.get("destNm", "unknown")
 
             trains_detected["total"] += 1
