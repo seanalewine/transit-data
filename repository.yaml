@@ -1,4 +1,3 @@
-# https://developers.home-assistant.io/docs/apps/repository#repository-configuration
-name: Example Home Assistant app repository
-url: 'https://github.com/home-assistant/apps-example'
-maintainer: Awesome Maintainer <awesome@example.com>
+name: Transit Data Extractor
+url: 'https://github.com/seanalewine/transit-data'
+maintainer: Sean Alewine <sean@seanalewine.app>

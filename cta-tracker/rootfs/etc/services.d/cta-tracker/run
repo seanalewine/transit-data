@@ -1,0 +1,21 @@
+#!/usr/bin/with-contenv bashio
+
+declare api_key
+declare poll_interval
+
+api_key=$(bashio::config 'api_key')
+poll_interval=$(bashio::config 'poll_interval')
+
+if [ -z "${api_key}" ]; then
+    bashio::log.fatal "API key is required. Please set the api_key option."
+    exit 1
+fi
+
+export CTA_API_KEY="${api_key}"
+export POLL_INTERVAL="${poll_interval:-60}"
+
+bashio::log.info "Starting CTA Train Tracker with ${POLL_INTERVAL}s poll interval"
+
+mkdir -p /share/cta_data
+
+exec /usr/bin/python3 /usr/bin/cta_tracker.py

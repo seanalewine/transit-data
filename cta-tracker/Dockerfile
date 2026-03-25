@@ -1,8 +1,6 @@
-# https://developers.home-assistant.io/docs/apps/configuration#app-dockerfile
 ARG BUILD_FROM=ghcr.io/home-assistant/base:3.23
 FROM ${BUILD_FROM}
 
-# Execute during the build of the image
 ARG TEMPIO_VERSION=2021.09.0
 ARG TARGETARCH
 RUN \
@@ -17,12 +15,13 @@ RUN \
     && curl -sSLf -o /usr/bin/tempio \
         "https://github.com/home-assistant/tempio/releases/download/${TEMPIO_VERSION}/tempio_${tempio_arch}"
 
-# Copy root filesystem
+RUN apk add --no-cache python3
+
 COPY rootfs /
 
 LABEL \
     io.hass.type="addon" \
-    org.opencontainers.image.title="Home Assistant App: Example app" \
-    org.opencontainers.image.description="Example app to use as a blueprint for new apps." \
+    org.opencontainers.image.title="Home Assistant App: CTA Train Tracker" \
+    org.opencontainers.image.description="Collects CTA train tracking data to monitor train movements." \
     org.opencontainers.image.source="https://github.com/home-assistant/apps-example" \
     org.opencontainers.image.licenses="Apache License 2.0"

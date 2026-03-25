@@ -1,0 +1,18 @@
+name: CTA Train Tracker
+version: "1.0.0"
+slug: cta-tracker
+description: Collects CTA train tracking data to monitor train movements
+url: "https://github.com/home-assistant/apps-example/tree/main/cta-tracker"
+arch:
+  - aarch64
+  - amd64
+init: false
+map:
+  - share:rw
+options:
+  api_key: ""
+  poll_interval: 60
+schema:
+  api_key: "str"
+  poll_interval: "int?"
+image: "ghcr.io/home-assistant/app-cta-tracker"
