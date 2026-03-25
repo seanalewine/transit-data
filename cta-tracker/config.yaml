@@ -15,4 +15,4 @@ options:
 schema:
   api_key: "str"
   poll_interval: "int?"
-image: "ghcr.io/home-assistant/app-cta-tracker"
+image: "ghcr.io/seanalewine/transit-data"
