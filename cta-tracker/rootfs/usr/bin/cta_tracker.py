@@ -76,7 +76,7 @@ def events_to_csv(events):
     if not events:
         return ""
     output = io.StringIO()
-    fieldnames = ["ts", "line", "rn", "trDr", "from_stop", "from_stop_name", "to_stop"]
+    fieldnames = ["ts", "line", "rn", "trDr", "from_stop", "from_stop_name", "to_stop", "to_stop_name", "full_route"]
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for event in events:
@@ -134,23 +134,52 @@ class DataHandler(BaseHTTPRequestHandler):
 
 def run_server(port):
     server = HTTPServer(("0.0.0.0", port), DataHandler)
-    print(f"Web server started on port {port}")
     server.serve_forever()
+
+
+def fetch_train_follow(api_key, run_number):
+    url = f"{API_BASE}/ttfollow.aspx?runnumber={run_number}&key={api_key}&outputType=JSON"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+            ctatt = data.get("ctatt", {})
+            err_cd = ctatt.get("errCd", "unknown")
+
+            if err_cd != "0":
+                return None
+
+            etas = ctatt.get("eta", [])
+            if not etas:
+                return None
+
+            if isinstance(etas, dict):
+                etas = [etas]
+
+            stops = []
+            for eta in etas:
+                stops.append({
+                    "staId": eta.get("staId"),
+                    "staNm": eta.get("staNm"),
+                    "arrT": eta.get("arrT"),
+                })
+
+            return stops
+
+    except Exception as e:
+        print(f"ERROR [follow] train {run_number}: {e}")
+        return None
 
 
 def fetch_trains(api_key, route):
     url = f"{API_BASE}/ttpositions.aspx?rt={route}&key={api_key}&outputType=JSON"
     try:
-        print(f"[{route.upper()}] Fetching from API...")
         with urllib.request.urlopen(url, timeout=30) as response:
             data = json.loads(response.read().decode("utf-8"))
             ctatt = data.get("ctatt", {})
             err_cd = ctatt.get("errCd", "unknown")
             err_nm = ctatt.get("errNm", "")
-            print(f"[{route.upper()}] API response: errCd={err_cd}, errNm={err_nm}")
+
             if err_cd != "0":
-                error_msg = f"{route}: API error {err_cd} - {err_nm}"
-                print(f"[{route.upper()}] {error_msg}")
                 debug_info["api_errors"].append({
                     "ts": datetime.now(timezone.utc).isoformat(),
                     "route": route,
@@ -159,36 +188,8 @@ def fetch_trains(api_key, route):
                 })
                 return {}
             return ctatt
-    except urllib.error.URLError as e:
-        error_msg = f"{route}: URL error - {e}"
-        print(f"[{route.upper()}] {error_msg}")
-        debug_info["api_errors"].append({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "route": route,
-            "error": str(e),
-        })
-        return {}
-    except json.JSONDecodeError as e:
-        error_msg = f"{route}: JSON decode error - {e}"
-        print(f"[{route.upper()}] {error_msg}")
-        debug_info["api_errors"].append({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "route": route,
-            "error": f"JSON decode: {e}",
-        })
-        return {}
-    except TimeoutError:
-        error_msg = f"{route}: Request timeout"
-        print(f"[{route.upper()}] {error_msg}")
-        debug_info["api_errors"].append({
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "route": route,
-            "error": "Timeout",
-        })
-        return {}
     except Exception as e:
-        error_msg = f"{route}: Unexpected error - {e}"
-        print(f"[{route.upper()}] {error_msg}")
+        print(f"ERROR [{route}] {e}")
         debug_info["api_errors"].append({
             "ts": datetime.now(timezone.utc).isoformat(),
             "route": route,
@@ -200,20 +201,18 @@ def fetch_trains(api_key, route):
 def process_route(api_key, route, state):
     ctatt = fetch_trains(api_key, route)
     routes = ctatt.get("route", [])
-    
+
     debug_info["last_api_responses"][route] = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "has_routes": bool(routes),
         "route_count": len(routes) if routes else 0,
     }
-    
+
     if not routes:
-        print(f"[{route.upper()}] No routes in response")
         return state
 
     target = TARGET_STATIONS.get(route)
     if not target:
-        print(f"[{route.upper()}] No target station configured")
         return state
 
     trains_detected = {"total": 0, "matching_direction": 0, "at_target": 0}
@@ -221,30 +220,22 @@ def process_route(api_key, route, state):
     for route_data in routes:
         trains = route_data.get("train", [])
         if not trains:
-            print(f"[{route.upper()}] No trains in route data")
             continue
 
         if isinstance(trains, dict):
             trains = [trains]
 
         trains_detected["total"] = len(trains)
-        print(f"[{route.upper()}] Found {len(trains)} train(s)")
 
         for train in trains:
             rn = train.get("rn")
             tr_dr = train.get("trDr")
             next_stop_id = train.get("nextStaId")
-            dest_nm = train.get("destNm", "unknown")
 
-            trains_detected["total"] += 1
-            
             if tr_dr == target["direction"]:
                 trains_detected["matching_direction"] += 1
-                print(f"[{route.upper()}] Train {rn}: trDr={tr_dr}, nextStapId={next_stop_id}, dest={dest_nm}")
-                
                 if next_stop_id == target["stop_id"]:
                     trains_detected["at_target"] += 1
-                    print(f"[{route.upper()}] Train {rn} is AT target station {target['name']}")
 
             if not rn or tr_dr != target["direction"]:
                 continue
@@ -253,6 +244,16 @@ def process_route(api_key, route, state):
             prev_stop = state.get(state_key)
 
             if prev_stop == target["stop_id"] and next_stop_id and next_stop_id != target["stop_id"]:
+                stops = fetch_train_follow(api_key, rn)
+                next_stop_name = None
+                full_route = []
+
+                if stops:
+                    full_route = [s["staId"] for s in stops]
+                    next_stop = stops[0]
+                    next_stop_id = next_stop["staId"]
+                    next_stop_name = next_stop["staNm"]
+
                 event = {
                     "ts": datetime.now(timezone.utc).isoformat(),
                     "line": route,
@@ -261,9 +262,11 @@ def process_route(api_key, route, state):
                     "from_stop": target["stop_id"],
                     "from_stop_name": target["name"],
                     "to_stop": next_stop_id,
+                    "to_stop_name": next_stop_name,
+                    "full_route": full_route,
                 }
                 append_event(event)
-                print(f"[{route.upper()}] LOGGED: Train {rn} departed {target['name']} -> {next_stop_id}")
+                print(f"{event['ts']} {route} train {rn} {target['name']} -> {next_stop_name or next_stop_id}")
 
             if next_stop_id:
                 state[state_key] = next_stop_id
@@ -284,31 +287,23 @@ def main():
     server_thread = threading.Thread(target=run_server, args=(server_port,), daemon=True)
     server_thread.start()
 
-    print(f"Starting CTA Train Tracker (poll interval: {poll_interval}s, port: {server_port})")
-    print(f"Target stations:")
-    print(f"  Blue Line: Harlem (stop_id=40980), Forest Park bound (trDr=5)")
-    print(f"  Red Line: Morse (stop_id=40100), Howard bound (trDr=1)")
-    
+    print(f"CTA Train Tracker running (interval: {poll_interval}s, port: {server_port})")
+
     state = load_state()
     debug_info["state"] = state
 
     while True:
         try:
             debug_info["last_poll"] = datetime.now(timezone.utc).isoformat()
-            print(f"\n--- Poll at {debug_info['last_poll']} ---")
-            
+
             state = process_route(api_key, "blue", state)
             state = process_route(api_key, "red", state)
-            
+
             debug_info["state"] = state
             save_state(state)
             save_debug_info()
-            
-            print(f"State now tracking {len(state)} train(s)")
         except Exception as e:
-            print(f"Error in main loop: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"ERROR [main] {e}")
 
         time.sleep(poll_interval)
 
