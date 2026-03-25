@@ -27,10 +27,11 @@ The app runs a web server that serves the collected data:
 
 | Endpoint | Description |
 |----------|-------------|
-| `/` or `/data.csv` | Download all train movements as CSV |
-| `/health` | Health check endpoint (returns "OK") |
-| `/status` | JSON status: last poll time, event count, trains being tracked |
-| `/debug` | Full debug info: API responses, state, errors |
+| `/` or `/data` | Train movements as JSON |
+| `/data.csv` | Train movements as CSV download |
+| `/health` | Health check (returns "OK") |
+| `/status` | Poll status and error summary |
+| `/debug` | Full debug info |
 
 Access the data at `http://<your-home-assistant-ip>:8080/data.csv`
 

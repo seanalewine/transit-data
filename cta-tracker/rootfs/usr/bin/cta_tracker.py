@@ -89,7 +89,13 @@ class DataHandler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/data.csv":
+        if self.path == "/" or self.path == "/data":
+            events = read_events()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(events, indent=2, default=str).encode("utf-8"))
+        elif self.path == "/data.csv":
             events = read_events()
             csv_data = events_to_csv(events)
             self.send_response(200)
