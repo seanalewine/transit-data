@@ -29,8 +29,19 @@ The app runs a web server that serves the collected data:
 |----------|-------------|
 | `/` or `/data.csv` | Download all train movements as CSV |
 | `/health` | Health check endpoint (returns "OK") |
+| `/status` | JSON status: last poll time, event count, trains being tracked |
+| `/debug` | Full debug info: API responses, state, errors |
 
 Access the data at `http://<your-home-assistant-ip>:8080/data.csv`
+
+## Troubleshooting
+
+If no data is appearing:
+
+1. Check `/status` endpoint - shows if API calls are succeeding
+2. Check `/debug` endpoint - shows raw API responses and any errors
+3. Verify API key is correct in configuration
+4. Note: Events are only logged when a train **departs** the target station. A train must first be detected at Harlem/Morse, then detected at a different station on the next poll.
 
 ## Getting an API Key
 

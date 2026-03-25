@@ -6,4 +6,7 @@
 - Records next stop after departure to JSONL log file
 - Built-in web server serving data as CSV at `/data.csv`
 - Health check endpoint at `/health`
+- Status endpoint at `/status` for monitoring
+- Debug endpoint at `/debug` for troubleshooting
+- Detailed logging of API responses and train detection
 - Configurable API key, poll interval, and server port
