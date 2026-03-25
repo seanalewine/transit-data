@@ -4,7 +4,7 @@ Home Assistant app that collects CTA (Chicago Transit Authority) train tracking 
 
 ## What it does
 
-Polls the CTA Train Tracker API to monitor train movements and records when trains depart specific stations.
+Polls the CTA Train Tracker API to monitor train movements and records when trains depart specific stations. Serves collected data via a built-in web server.
 
 ### Tracked routes
 
@@ -19,6 +19,18 @@ For each departure, it records the next stop the train appears at.
 |--------|------|----------|---------|-------------|
 | `api_key` | string | Yes | - | Your CTA Train Tracker API key |
 | `poll_interval` | integer | No | 60 | Seconds between API polls |
+| `server_port` | integer | No | 8080 | Port for the web server |
+
+## Web Server
+
+The app runs a web server that serves the collected data:
+
+| Endpoint | Description |
+|----------|-------------|
+| `/` or `/data.csv` | Download all train movements as CSV |
+| `/health` | Health check endpoint (returns "OK") |
+
+Access the data at `http://<your-home-assistant-ip>:8080/data.csv`
 
 ## Getting an API Key
 
@@ -29,10 +41,13 @@ For each departure, it records the next stop the train appears at.
 
 ## Data Output
 
-Data is stored in `/share/cta_data/train_movements.jsonl` as JSON Lines format:
+Data is stored in `/share/cta_data/train_movements.jsonl` as JSON Lines format and served via the web server as CSV.
 
-```json
-{"ts":"2026-03-25T10:30:00Z","line":"blue","rn":"830","trDr":5,"from_stop":"40980","from_stop_name":"Harlem","to_stop":"40970"}
+### CSV Format
+
+```csv
+ts,line,rn,trDr,from_stop,from_stop_name,to_stop
+2026-03-25T10:30:00Z,blue,830,5,40980,Harlem,40970
 ```
 
 ### Fields

@@ -2,9 +2,11 @@
 
 declare api_key
 declare poll_interval
+declare server_port
 
 api_key=$(bashio::config 'api_key')
 poll_interval=$(bashio::config 'poll_interval')
+server_port=$(bashio::config 'server_port')
 
 if [ -z "${api_key}" ]; then
     bashio::log.fatal "API key is required. Please set the api_key option."
@@ -13,8 +15,9 @@ fi
 
 export CTA_API_KEY="${api_key}"
 export POLL_INTERVAL="${poll_interval:-60}"
+export SERVER_PORT="${server_port:-8080}"
 
-bashio::log.info "Starting CTA Train Tracker with ${POLL_INTERVAL}s poll interval"
+bashio::log.info "Starting CTA Train Tracker (poll: ${POLL_INTERVAL}s, port: ${SERVER_PORT})"
 
 mkdir -p /share/cta_data
 
