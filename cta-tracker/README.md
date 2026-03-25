@@ -53,13 +53,24 @@ If no data is appearing:
 
 ## Data Output
 
-Data is stored in `/share/cta_data/train_movements.jsonl` as JSON Lines format and served via the web server as CSV.
+Data is stored in `/share/cta_data/train_movements.jsonl` as JSON Lines format and served via the web server as JSON.
 
-### CSV Format
+### JSON Format
 
-```csv
-ts,line,rn,trDr,from_stop,from_stop_name,to_stop
-2026-03-25T10:30:00Z,blue,830,5,40980,Harlem,40970
+```json
+{
+  "ts": "2026-03-25T20:32:23.752476+00:00",
+  "line": "red",
+  "rn": "825",
+  "trDr": 1,
+  "from_stop": "40100",
+  "from_stop_name": "Morse",
+  "to_stop": "41190",
+  "to_stop_name": "Jarvis",
+  "locations_nextStaId": "40900",
+  "follow_nextStop": "41190",
+  "full_route": ["41190", "40900"]
+}
 ```
 
 ### Fields
@@ -70,7 +81,15 @@ ts,line,rn,trDr,from_stop,from_stop_name,to_stop
 - `trDr`: Train direction code
 - `from_stop`: Stop ID where train departed
 - `from_stop_name`: Stop name
-- `to_stop`: Next stop ID where train appeared
+- `to_stop`: True next stop ID (from Follow This Train API)
+- `to_stop_name`: True next stop name
+- `locations_nextStaId`: What Locations API reported as next stop
+- `follow_nextStop`: What Follow This Train API reported as next stop
+- `full_route`: Array of all upcoming stop IDs
+
+### Verification
+
+If `locations_nextStaId` differs from `to_stop`, this indicates the Locations API returned an incorrect next stop (e.g., showing Howard instead of Jarvis).
 
 ## API Limits
 

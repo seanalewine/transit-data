@@ -76,7 +76,13 @@ def events_to_csv(events):
     if not events:
         return ""
     output = io.StringIO()
-    fieldnames = ["ts", "line", "rn", "trDr", "from_stop", "from_stop_name", "to_stop", "to_stop_name", "full_route"]
+    fieldnames = [
+        "ts", "line", "rn", "trDr",
+        "from_stop", "from_stop_name",
+        "to_stop", "to_stop_name",
+        "locations_nextStaId", "follow_nextStop",
+        "full_route"
+    ]
     writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for event in events:
@@ -215,6 +221,7 @@ def process_route(api_key, route, state):
     if not target:
         return state
 
+    target_id = target["stop_id"]
     trains_detected = {"total": 0, "matching_direction": 0, "at_target": 0}
 
     for route_data in routes:
@@ -230,46 +237,75 @@ def process_route(api_key, route, state):
         for train in trains:
             rn = train.get("rn")
             tr_dr = train.get("trDr")
-            next_stop_id = train.get("nextStaId")
+            locations_next_staid = train.get("nextStaId")
 
             if tr_dr == target["direction"]:
                 trains_detected["matching_direction"] += 1
-                if next_stop_id == target["stop_id"]:
+                if locations_next_staid == target_id:
                     trains_detected["at_target"] += 1
 
             if not rn or tr_dr != target["direction"]:
                 continue
 
             state_key = f"{route}_{rn}"
-            prev_stop = state.get(state_key)
+            prev_state = state.get(state_key, {})
+            prev_has_target = prev_state.get("has_target", False)
+            prev_stops = prev_state.get("stops", [])
 
-            if prev_stop == target["stop_id"] and next_stop_id and next_stop_id != target["stop_id"]:
+            current_state = {"locations_nextStaId": locations_next_staid}
+
+            if locations_next_staid == target_id:
                 stops = fetch_train_follow(api_key, rn)
-                next_stop_name = None
-                full_route = []
 
                 if stops:
-                    full_route = [s["staId"] for s in stops]
-                    next_stop = stops[0]
-                    next_stop_id = next_stop["staId"]
-                    next_stop_name = next_stop["staNm"]
+                    stop_ids = [s["staId"] for s in stops]
+                    has_target = target_id in stop_ids
+                    current_state["has_target"] = has_target
+                    current_state["stops"] = stops
 
+                    if prev_has_target and not has_target:
+                        follow_next_stop = stops[0] if stops else None
+                        event = {
+                            "ts": datetime.now(timezone.utc).isoformat(),
+                            "line": route,
+                            "rn": rn,
+                            "trDr": int(tr_dr),
+                            "from_stop": target_id,
+                            "from_stop_name": target["name"],
+                            "to_stop": follow_next_stop["staId"] if follow_next_stop else locations_next_staid,
+                            "to_stop_name": follow_next_stop["staNm"] if follow_next_stop else None,
+                            "locations_nextStaId": locations_next_staid,
+                            "follow_nextStop": follow_next_stop["staId"] if follow_next_stop else None,
+                            "full_route": stop_ids,
+                        }
+                        append_event(event)
+                        print(f"{event['ts']} {route} train {rn} {target['name']} -> {event['to_stop_name'] or event['to_stop']}")
+                else:
+                    current_state["has_target"] = False
+                    current_state["stops"] = []
+
+            elif prev_has_target:
+                follow_next_stop = prev_stops[0] if prev_stops else None
                 event = {
                     "ts": datetime.now(timezone.utc).isoformat(),
                     "line": route,
                     "rn": rn,
                     "trDr": int(tr_dr),
-                    "from_stop": target["stop_id"],
+                    "from_stop": target_id,
                     "from_stop_name": target["name"],
-                    "to_stop": next_stop_id,
-                    "to_stop_name": next_stop_name,
-                    "full_route": full_route,
+                    "to_stop": follow_next_stop["staId"] if follow_next_stop else locations_next_staid,
+                    "to_stop_name": follow_next_stop["staNm"] if follow_next_stop else None,
+                    "locations_nextStaId": locations_next_staid,
+                    "follow_nextStop": follow_next_stop["staId"] if follow_next_stop else None,
+                    "full_route": [s["staId"] for s in prev_stops],
                 }
                 append_event(event)
-                print(f"{event['ts']} {route} train {rn} {target['name']} -> {next_stop_name or next_stop_id}")
+                print(f"{event['ts']} {route} train {rn} {target['name']} -> {event['to_stop_name'] or event['to_stop']}")
 
-            if next_stop_id:
-                state[state_key] = next_stop_id
+                current_state["has_target"] = False
+                current_state["stops"] = []
+
+            state[state_key] = current_state
 
     debug_info["trains_detected"][route] = trains_detected
     return state

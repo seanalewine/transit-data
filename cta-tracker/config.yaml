@@ -1,5 +1,5 @@
 name: CTA Train Tracker
-version: "1.0.5"
+version: "1.0.6"
 slug: cta-tracker
 description: Collects CTA train tracking data to monitor train movements
 url: "https://github.com/home-assistant/apps-example/tree/main/cta-tracker"
